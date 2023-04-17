@@ -1,0 +1,50 @@
+//@version=5
+strategy("My Strategy", overlay=true)
+
+// Define the Supertrend indicator
+length = input.int(10, minval=1, title="Length") // Length of the Supertrend indicator
+multiplier = input.float(3.0, minval=0.001, maxval=5, title="Multiplier") // Multiplier for the Supertrend indicator
+
+// Calculate the Supertrend factor
+atr_length = ta.atr(length)
+factor = multiplier * atr_length
+
+// Define the Supertrend indicator
+hlc3_ = (high + low + close) / 3
+tr = max(max(high - low, abs(high - ta.value(close, 1))), abs(low - ta.value(close, 1)))
+up = hlc3_ - factor * tr
+down = hlc3_ + factor * tr
+in_uptrend = true
+supertrend = 0.0
+supertrend := in_uptrend ? up : down
+for i = 1 to length - 1
+    supertrend := in_uptrend ? math.min(supertrend[1], up) : math.max(supertrend[1], down)
+    in_uptrend := up < supertrend[1] or (up == supertrend[1] and not in_uptrend)
+
+// Buy signal
+buy_signal = crossover(close, supertrend)
+// Sell signal
+sell_signal = crossunder(close, supertrend)
+
+// Set stop loss and take profit levels
+stop_loss = input.float(0.5, title="Stop Loss (%)", step=0.1)
+take_profit = input.float(1, title="Take Profit (%)", step=0.1)
+
+// Add error handling for user inputs
+if stop_loss < 0 or na(stop_loss)
+    stop_loss := na
+if take_profit < 0 or na(take_profit)
+    take_profit := na
+
+// Add the entry orders
+if buy_signal
+    strategy.entry("Buy", strategy.long, when=buy_signal, stop=stop_loss, limit=take_profit)
+else if sell_signal
+    strategy.entry("Sell", strategy.short, when=sell_signal, stop=stop_loss, limit=take_profit)
+
+// Add a backtesting function to test the strategy's performance
+backtest_results = strategy.test(strategy= "My Strategy", currency= currency.USD, commission_type= strategy.commission.percent, commission_value= 0.1, initial_capital= 10000, slippage= 2)
+
+// Plot the Supertrend indicator and the backtesting results
+plot(supertrend, color=color.blue)
+plot(backtest_results)
